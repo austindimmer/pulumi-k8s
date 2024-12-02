@@ -54,9 +54,9 @@ if (stack === "minikube") {
     import("./crossplane").then((crossplane) => {
         console.log("Crossplane deployed to Minikube.");
     });
-    // import("./kubeflow").then((kubeflow) => {
-    //     console.log("Kubeflow deployed to Minikube.");
-    // });
+    import("./kubeflow").then((kubeflow) => {
+        console.log("Kubeflow deployed to Minikube.");
+    });
 } else if (stack === "aws") {
     console.log("Deploying to AWS...");
 

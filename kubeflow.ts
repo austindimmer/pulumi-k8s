@@ -20,19 +20,49 @@ const dockerSecret = new command.local.Command("dockerSecret", {
     dependsOn: [kubeflowNamespace],
 });
 
+// Clone the Kubeflow manifests repository locally
+const cloneKubeflowRepo = new command.local.Command("cloneKubeflowRepo", {
+    create: `
+        echo "Cloning Kubeflow manifests repository...";
+        git clone -b v1.9-branch https://github.com/kubeflow/manifests.git /tmp/kubeflow-manifests;
+    `,
+    delete: `rm -rf /tmp/kubeflow-manifests`,
+}, {
+    dependsOn: [kubeflowNamespace],
+});
+
 // Apply Kubeflow manifests with retry logic
 const kubeflowManifests = new command.local.Command("applyKubeflowManifests", {
     create: `
-        while ! kustomize build "https://github.com/kubeflow/manifests.git/v1.9-branch/example" | kubectl apply -f -; do 
-            echo "Retrying to apply resources"; 
-            sleep 20; 
+        echo "Building and applying Kubeflow manifests...";
+        cd /tmp/kubeflow-manifests/example;
+        while true; do
+            echo "Building manifests using kustomize...";
+            kustomize build . > /tmp/kubeflow.yaml;
+            if [ $? -eq 0 ]; then
+                echo "Applying manifests using kubectl...";
+                kubectl apply -f /tmp/kubeflow.yaml;
+                if [ $? -eq 0 ]; then
+                    echo "Kubeflow manifests applied successfully.";
+                    break;
+                else
+                    echo "kubectl apply failed. Retrying in 20 seconds...";
+                fi
+            else
+                echo "kustomize build failed. Retrying in 20 seconds...";
+            fi
+            sleep 20;
         done
     `,
-    delete: `kustomize build "https://github.com/kubeflow/manifests.git/v1.9-branch/example" | kubectl delete -f -`,
+    delete: `
+        echo "Deleting Kubeflow manifests...";
+        cd /tmp/kubeflow-manifests/example;
+        kustomize build . | kubectl delete -f -;
+    `,
 }, {
-    dependsOn: [kubeflowNamespace, dockerSecret],
+    dependsOn: [cloneKubeflowRepo, dockerSecret],
     customTimeouts: { create: "15m" }, // Allow sufficient time for retries
 });
 
 // Export resources
-export { kubeflowNamespace, dockerSecret, kubeflowManifests };
+export { kubeflowNamespace, dockerSecret, cloneKubeflowRepo, kubeflowManifests };
