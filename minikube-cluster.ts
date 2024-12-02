@@ -2,8 +2,12 @@ import * as k8s from "@pulumi/kubernetes";
 import * as command from "@pulumi/command";
 
 // Configuration for Minikube
-const cpus = 4; // Number of CPUs to allocate
-const memory = 8192; // Memory in MB to allocate
+
+// Kubeflow Prerequisites
+// 32 GB of RAM recommended
+// 16 CPU cores recommended
+const cpus = 16; // Number of CPUs to allocate
+const memory = "32g"; // Amount of memory to allocate
 
 // Ensure Minikube is started with the required resources
 export const startMinikube = new command.local.Command("startMinikube", {
