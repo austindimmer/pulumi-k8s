@@ -45,6 +45,9 @@ if (stack === "minikube") {
     import("./istio").then((istio) => {
         console.log("Istio deployed to Minikube.");
     });
+    import("./security-tools").then((securityTools) => {
+        console.log("Security tools deployed to Minikube.");
+    });
 } else if (stack === "aws") {
     console.log("Deploying to AWS...");
 
