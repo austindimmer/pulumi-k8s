@@ -51,9 +51,9 @@ if (stack === "minikube") {
     import("./argocd").then((argocd) => {
         console.log("ArgoCD deployed to Minikube.");
     });
-    // import("./crossplane").then((crossplane) => {
-    //     console.log("Crossplane deployed to Minikube.");
-    // });
+    import("./crossplane").then((crossplane) => {
+        console.log("Crossplane deployed to Minikube.");
+    });
     // import("./kubeflow").then((kubeflow) => {
     //     console.log("Kubeflow deployed to Minikube.");
     // });
