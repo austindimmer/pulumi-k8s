@@ -1,67 +1,73 @@
-// import * as pulumi from "@pulumi/pulumi";
-// import * as localCluster from "./minikube-cluster";
-// // import * as awsCluster from "./eks-cluster";
-// // import * as securityTools from "./security-tools";
-// import * as istio from "./istio";
-// // import * as argocd from "./argocd";
-// // import * as crossplane from "./crossplane";
-// // import * as kubeflow from "./kubeflow";
-
-// // Get the current stack name.
-// const stack = pulumi.getStack();
-
-// // Conditional deployment based on the stack.
-// if (stack === "minikube") {
-//     console.log("Deploying to Minikube...");
-//     localCluster; // Minikube cluster setup.
-//     // securityTools; // Security tools for Minikube.
-//     istio;         // Istio deployment for Minikube.
-//     // argocd;        // ArgoCD deployment for Minikube.
-//     // crossplane;    // Crossplane deployment for Minikube.
-//     // kubeflow;      // Kubeflow deployment for Minikube.
-// } else if (stack === "aws") {
-//     console.log("Deploying to AWS...");
-//     // awsCluster; // EKS cluster setup.
-//     // securityTools; // Security tools for AWS.
-//     istio;         // Istio deployment for AWS.
-//     // argocd;        // ArgoCD deployment for AWS.
-//     // crossplane;    // Crossplane deployment for AWS.
-//     // kubeflow;      // Kubeflow deployment for AWS.
-// } else {
-//     throw new Error(`Unknown stack: ${stack}. Valid stacks are "minikube" or "aws".`);
-// }
-
-
 import * as pulumi from "@pulumi/pulumi";
-import * as localCluster from "./minikube-cluster";
+import { BaseCluster, IMinikubeClusterConfig, IEksClusterConfig, IAksClusterConfig } from "./base-cluster";
 
-const stack = pulumi.getStack();
-
-if (stack === "minikube") {
-    console.log("Deploying to Minikube...");
-    const provider = localCluster.provider;
-
-    // Import and deploy Istio
-    import("./istio").then((istio) => {
-        console.log("Istio deployed to Minikube.");
-    });
-    import("./security-tools").then((securityTools) => {
-        console.log("Security tools deployed to Minikube.");
-    });
-    import("./argocd").then((argocd) => {
-        console.log("ArgoCD deployed to Minikube.");
-    });
-    import("./crossplane").then((crossplane) => {
-        console.log("Crossplane deployed to Minikube.");
-    });
-    import("./kubeflow").then((kubeflow) => {
-        console.log("Kubeflow deployed to Minikube.");
-    });
-} else if (stack === "aws") {
-    console.log("Deploying to AWS...");
-
-    // AWS-specific setup, e.g., EKS
-} else {
-    throw new Error(`Unknown stack: ${stack}. Valid stacks are "minikube" or "aws".`);
+// Helper function to deploy workloads to a specific cluster
+async function deployWorkloads(provider: pulumi.ProviderResource, workloads: string[]): Promise<void> {
+    for (const workload of workloads) {
+        await import(`./workloads/${workload}`)
+            .then((module) => module.deploy(provider))
+            .then(() => console.log(`${workload} deployed successfully.`))
+            .catch((err) => console.error(`Error deploying ${workload}:`, err));
+    }
 }
 
+// Define configurations for each cluster
+const argoClusterConfig: IMinikubeClusterConfig = {
+    name: "argo-cluster",
+    provider: "minikube",
+    numberOfCpus: 4,
+    memory: "8g",
+    metalLbRange: "192.168.49.200-192.168.49.210",
+    enableSecurityTools: true,
+};
+
+const crossplaneClusterConfig: IMinikubeClusterConfig = {
+    name: "crossplane-cluster",
+    provider: "minikube",
+    numberOfCpus: 4,
+    memory: "8g",
+    metalLbRange: "192.168.49.211-192.168.49.220",
+    enableSecurityTools: true,
+};
+
+const kubeflowClusterConfig: IMinikubeClusterConfig = {
+    name: "kubeflow-cluster",
+    provider: "minikube",
+    numberOfCpus: 16,
+    memory: "32g",
+    metalLbRange: "192.168.49.221-192.168.49.230",
+    enableSecurityTools: true,
+};
+
+// Define workloads for each cluster
+const argoWorkloads = ["security-tools", "istio", "argocd"];
+const crossplaneWorkloads = ["security-tools", "istio", "crossplane"];
+const kubeflowWorkloads = ["security-tools", "kubeflow"];
+
+// Deploy clusters and their respective workloads
+async function deployClusters(): Promise<void> {
+    console.log("Starting deployment...");
+
+    // Create Argo cluster and deploy workloads
+    console.log("Creating Argo cluster...");
+    const argoCluster = new BaseCluster(argoClusterConfig);
+    await deployWorkloads(argoCluster.provider, argoWorkloads);
+
+    // Create Crossplane cluster and deploy workloads
+    console.log("Creating Crossplane cluster...");
+    const crossplaneCluster = new BaseCluster(crossplaneClusterConfig);
+    await deployWorkloads(crossplaneCluster.provider, crossplaneWorkloads);
+
+    // Create Kubeflow cluster and deploy workloads
+    console.log("Creating Kubeflow cluster...");
+    const kubeflowCluster = new BaseCluster(kubeflowClusterConfig);
+    await deployWorkloads(kubeflowCluster.provider, kubeflowWorkloads);
+
+    console.log("All clusters and workloads deployed successfully.");
+}
+
+// Run the deployment
+deployClusters().catch((err) => {
+    console.error("Deployment failed:", err);
+    process.exit(1);
+});
