@@ -1,73 +1,65 @@
 import * as pulumi from "@pulumi/pulumi";
-import { BaseCluster, IMinikubeClusterConfig, IEksClusterConfig, IAksClusterConfig } from "./base-cluster";
+import { createCluster } from "./clusters/cluster-factory";
+import { IMinikubeClusterConfig, IEksClusterConfig } from "./types/interfaces";
+import { deployWorkloads } from "./utils/k8s";
 
-// Helper function to deploy workloads to a specific cluster
-async function deployWorkloads(provider: pulumi.ProviderResource, workloads: string[]): Promise<void> {
-    for (const workload of workloads) {
-        await import(`./workloads/${workload}`)
-            .then((module) => module.deploy(provider))
-            .then(() => console.log(`${workload} deployed successfully.`))
-            .catch((err) => console.error(`Error deploying ${workload}:`, err));
-    }
-}
-
-// Define configurations for each cluster
-const argoClusterConfig: IMinikubeClusterConfig = {
-    name: "argo-cluster",
-    provider: "minikube",
-    numberOfCpus: 4,
-    memory: "8g",
-    metalLbRange: "192.168.49.200-192.168.49.210",
-    enableSecurityTools: true,
-};
-
-const crossplaneClusterConfig: IMinikubeClusterConfig = {
-    name: "crossplane-cluster",
-    provider: "minikube",
-    numberOfCpus: 4,
-    memory: "8g",
-    metalLbRange: "192.168.49.211-192.168.49.220",
-    enableSecurityTools: true,
-};
-
-const kubeflowClusterConfig: IMinikubeClusterConfig = {
-    name: "kubeflow-cluster",
-    provider: "minikube",
-    numberOfCpus: 16,
-    memory: "32g",
-    metalLbRange: "192.168.49.221-192.168.49.230",
-    enableSecurityTools: true,
+// Define your cluster configurations
+const clusterConfigs: Record<string, IMinikubeClusterConfig | IEksClusterConfig> = {
+    "minikube-argocd": {
+        name: "minikube-argocd",
+        provider: "minikube",
+        kubernetesVersion: "1.30.2",
+        numberOfCpus: 4,
+        memory: "8g",
+        metalLbRange: "192.168.49.200-192.168.49.210",
+    },
+    "crossplane-cluster": {
+        name: "crossplane-cluster",
+        provider: "minikube",
+        kubernetesVersion: "1.30.2",
+        numberOfCpus: 4,
+        memory: "8g",
+        metalLbRange: "192.168.49.211-192.168.49.220",
+    },
+    "kubeflow-cluster": {
+        name: "kubeflow-cluster",
+        provider: "minikube",
+        kubernetesVersion: "1.30.2",
+        numberOfCpus: 16,
+        memory: "32g",
+        metalLbRange: "192.168.49.221-192.168.49.230",
+    },
+    // "kubeflow-cluster-eks": {
+    //     name: "kubeflow-cluster-eks",
+    //     provider: "eks",
+    //     desiredCapacity: 3,
+    //     instanceType: "t3.large",
+    //     minSize: 1,
+    //     maxSize: 5,
+    // },
 };
 
 // Define workloads for each cluster
-const argoWorkloads = ["security-tools", "istio", "argocd"];
-const crossplaneWorkloads = ["security-tools", "istio", "crossplane"];
-const kubeflowWorkloads = ["security-tools", "kubeflow"];
+const workloads: Record<string, string[]> = {
+    "argo-cluster": ["security-tools", "istio", "argocd"],
+    "minikube-argocd": ["security-tools"],
+    "crossplane-cluster": ["security-tools", "istio", "crossplane"],
+    "kubeflow-cluster": ["security-tools", "kubeflow"],
+};
 
-// Deploy clusters and their respective workloads
-async function deployClusters(): Promise<void> {
-    console.log("Starting deployment...");
+// Deploy the appropriate cluster and workloads
+(async function main() {
+    const stack = pulumi.getStack();
+    const config = clusterConfigs[stack];
 
-    // Create Argo cluster and deploy workloads
-    console.log("Creating Argo cluster...");
-    const argoCluster = new BaseCluster(argoClusterConfig);
-    await deployWorkloads(argoCluster.provider, argoWorkloads);
+    if (!config) {
+        throw new Error(`Unknown stack: ${stack}`);
+    }
 
-    // Create Crossplane cluster and deploy workloads
-    console.log("Creating Crossplane cluster...");
-    const crossplaneCluster = new BaseCluster(crossplaneClusterConfig);
-    await deployWorkloads(crossplaneCluster.provider, crossplaneWorkloads);
+    // Create the cluster
+    const provider = createCluster(config);
 
-    // Create Kubeflow cluster and deploy workloads
-    console.log("Creating Kubeflow cluster...");
-    const kubeflowCluster = new BaseCluster(kubeflowClusterConfig);
-    await deployWorkloads(kubeflowCluster.provider, kubeflowWorkloads);
-
-    console.log("All clusters and workloads deployed successfully.");
-}
-
-// Run the deployment
-deployClusters().catch((err) => {
-    console.error("Deployment failed:", err);
-    process.exit(1);
-});
+    // Deploy workloads
+    const clusterName = config.name;
+    await deployWorkloads(provider, clusterName, workloads[stack]);
+})();

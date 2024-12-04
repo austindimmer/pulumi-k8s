@@ -122,25 +122,45 @@
 
 
 import * as k8s from "@pulumi/kubernetes";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
 
-export function deploy(provider: k8s.Provider): Promise<void> {
-    console.log("Deploying Security Tools...");
+export function deploy(provider: k8s.Provider, clusterName: string): Promise<void> {
+    if (!clusterName) {
+        throw new Error("Cluster name is required to deploy security tools.");
+    }
 
-    const securityNamespace = new k8s.core.v1.Namespace("security-tools", {
-        metadata: { name: "security-tools" },
+    console.log(`Deploying Security Tools to cluster: ${clusterName}`);
+
+    const namespaceName = `security-tools-${clusterName}`;
+
+    const securityNamespace = new k8s.core.v1.Namespace(namespaceName, {
+        metadata: { name: namespaceName },
     }, { provider });
 
-    new k8s.yaml.ConfigFile("kube-bench", {
-        file: "https://raw.githubusercontent.com/aquasecurity/kube-bench/main/job.yaml",
+    // Read and customize YAML
+    const kubeBenchYaml = yaml.load(fs.readFileSync("/workspaces/effektiv-ai/src/pulumi-k8s/kube-bench/kube-bench.yaml", "utf8")) as any;
+    kubeBenchYaml.metadata.name = `kube-bench-${clusterName}`; // Add custom name
+    kubeBenchYaml.metadata.namespace = namespaceName; // Set namespace
+
+    // Apply customized YAML
+    new k8s.yaml.ConfigGroup(`kube-bench-${clusterName}`, {
+        yaml: [yaml.dump(kubeBenchYaml)],
     }, { provider, dependsOn: [securityNamespace] });
 
-    new k8s.helm.v3.Chart("gatekeeper", {
+    // Deploy Gatekeeper with unique fullnameOverride
+    new k8s.helm.v3.Chart(`gatekeeper-${clusterName}`, {
         chart: "gatekeeper",
         version: "3.11.0",
         fetchOpts: { repo: "https://open-policy-agent.github.io/gatekeeper/charts" },
-        namespace: "security-tools",
+        namespace: namespaceName,
+        values: {
+            fullnameOverride: `gatekeeper-${clusterName}`, // Ensure unique names
+        },
     }, { provider, dependsOn: [securityNamespace] });
 
     return Promise.resolve();
 }
+
+
 
