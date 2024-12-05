@@ -13,16 +13,16 @@ const clusterConfigs: Record<string, IMinikubeClusterConfig | IEksClusterConfig>
         memory: "8g",
         metalLbRange: "192.168.49.200-192.168.49.210",
     },
-    "crossplane-cluster": {
-        name: "crossplane-cluster",
+    "minikube-crossplane": {
+        name: "minikube-crossplane",
         provider: "minikube",
         kubernetesVersion: "1.30.2",
         numberOfCpus: 4,
         memory: "8g",
         metalLbRange: "192.168.49.211-192.168.49.220",
     },
-    "kubeflow-cluster": {
-        name: "kubeflow-cluster",
+    "minikube-kubeflow": {
+        name: "minikube-kubeflow",
         provider: "minikube",
         kubernetesVersion: "1.30.2",
         numberOfCpus: 16,
@@ -42,7 +42,9 @@ const clusterConfigs: Record<string, IMinikubeClusterConfig | IEksClusterConfig>
 // Define workloads for each cluster
 const workloads: Record<string, string[]> = {
     "argo-cluster": ["security-tools", "istio", "argocd"],
-    "minikube-argocd": ["security-tools"],
+    "minikube-argocd": ["security-tools", "istio"],
+    "minikube-crossplane": ["security-tools"],
+    "minikube-kubeflow": ["security-tools"],
     "crossplane-cluster": ["security-tools", "istio", "crossplane"],
     "kubeflow-cluster": ["security-tools", "kubeflow"],
 };

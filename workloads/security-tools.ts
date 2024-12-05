@@ -132,7 +132,7 @@ export function deploy(provider: k8s.Provider, clusterName: string): Promise<voi
 
     console.log(`Deploying Security Tools to cluster: ${clusterName}`);
 
-    const namespaceName = `security-tools-${clusterName}`;
+    const namespaceName = `security-tools`;
 
     const securityNamespace = new k8s.core.v1.Namespace(namespaceName, {
         metadata: { name: namespaceName },
@@ -140,22 +140,21 @@ export function deploy(provider: k8s.Provider, clusterName: string): Promise<voi
 
     // Read and customize YAML
     const kubeBenchYaml = yaml.load(fs.readFileSync("/workspaces/effektiv-ai/src/pulumi-k8s/kube-bench/kube-bench.yaml", "utf8")) as any;
-    kubeBenchYaml.metadata.name = `kube-bench-${clusterName}`; // Add custom name
+    kubeBenchYaml.metadata.name = `kube-bench`;
     kubeBenchYaml.metadata.namespace = namespaceName; // Set namespace
 
     // Apply customized YAML
-    new k8s.yaml.ConfigGroup(`kube-bench-${clusterName}`, {
+    new k8s.yaml.ConfigGroup(`kube-bench`, {
         yaml: [yaml.dump(kubeBenchYaml)],
     }, { provider, dependsOn: [securityNamespace] });
 
-    // Deploy Gatekeeper with unique fullnameOverride
-    new k8s.helm.v3.Chart(`gatekeeper-${clusterName}`, {
+    new k8s.helm.v3.Chart(`gatekeeper`, {
         chart: "gatekeeper",
         version: "3.11.0",
         fetchOpts: { repo: "https://open-policy-agent.github.io/gatekeeper/charts" },
         namespace: namespaceName,
         values: {
-            fullnameOverride: `gatekeeper-${clusterName}`, // Ensure unique names
+            fullnameOverride: `gatekeeper`,
         },
     }, { provider, dependsOn: [securityNamespace] });
 
