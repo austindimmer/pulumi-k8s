@@ -1,6 +1,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
 import * as command from "@pulumi/command";
+import { configureKubeflowIAM } from "../iam/kubeflow-iam";
 
 export async function deploy(provider: k8s.Provider): Promise<void> {
     console.log("Deploying Kubeflow...");
@@ -87,6 +88,13 @@ export async function deploy(provider: k8s.Provider): Promise<void> {
         customTimeouts: { delete: "5m" }, // Timeout for namespace deletion
         deleteBeforeReplace: true, // Ensure the namespace is deleted before re-creating
         dependsOn: [kubeflowManifests], // Wait for manifests to be deleted first
+    });
+
+    // Configure IAM for Kubeflow
+    const roleBinding = configureKubeflowIAM({
+        provider,
+        namespace: "kubeflow",
+        userName: "minikube-kubeflow",
     });
 
     console.log("Kubeflow deployed successfully.");

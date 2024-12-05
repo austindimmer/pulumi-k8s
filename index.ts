@@ -41,10 +41,10 @@ const clusterConfigs: Record<string, IMinikubeClusterConfig | IEksClusterConfig>
 
 // Define workloads for each cluster
 const workloads: Record<string, string[]> = {
-    "argo-cluster": ["security-tools", "istio", "argocd"],
     "minikube-argocd": ["security-tools", "istio", "argocd"],
     "minikube-crossplane": ["security-tools", "istio", "crossplane"],
     "minikube-kubeflow": ["security-tools", "kubeflow"], // Isto is bundled already as part of Kubeflow so no need to specify it here
+    "argo-cluster": ["security-tools", "istio", "argocd"],
     "crossplane-cluster": ["security-tools", "istio", "crossplane"],
     "kubeflow-cluster": ["security-tools", "kubeflow"],
 };
