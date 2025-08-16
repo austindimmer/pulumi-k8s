@@ -17,17 +17,16 @@ export async function deploy(provider: k8s.Provider): Promise<void> {
     // Create the necessary Secret for Docker image pulling
     const dockerSecret = new command.local.Command("dockerSecret", {
         create: `
-            kubectl create secret generic regcred \
-                --from-file=.dockerconfigjson=/workspaces/effektiv-ai/effektivai/.docker/config.json \
-                --type=kubernetes.io/dockerconfigjson
-        `,
-        delete: `
-            echo "Deleting Docker secret...";
-            if kubectl get secret regcred; then
-                kubectl delete secret regcred --ignore-not-found=true;
+            cfg="$HOME/.docker/config.json"
+            if [ -f "\${cfg}" ]; then
+                kubectl create secret generic regcred \\
+                    --from-file=.dockerconfigjson="\${cfg}" \\
+                    --type=kubernetes.io/dockerconfigjson -n kubeflow
+            else
+                echo "Skipping regcred: \${cfg} not found"
             fi
         `,
-        triggers: [], // Optional: Add triggers if the secret needs to be updated
+        delete: `kubectl delete secret regcred -n kubeflow --ignore-not-found=true`,
     }, {
         dependsOn: [kubeflowNamespace],
     });
@@ -36,7 +35,7 @@ export async function deploy(provider: k8s.Provider): Promise<void> {
     const cloneKubeflowRepo = new command.local.Command("cloneKubeflowRepo", {
         create: `
             echo "Cloning Kubeflow manifests repository...";
-            git clone -b v1.9-branch https://github.com/kubeflow/manifests.git /tmp/kubeflow-manifests || echo "Repo already cloned";
+            git clone -b v1.10.2 https://github.com/kubeflow/manifests.git /tmp/kubeflow-manifests || echo "Repo already cloned";
         `,
         delete: `
             echo "Cleaning up Kubeflow manifests repository...";
