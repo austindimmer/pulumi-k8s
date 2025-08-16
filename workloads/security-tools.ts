@@ -124,6 +124,7 @@
 import * as k8s from "@pulumi/kubernetes";
 import * as fs from "fs";
 import * as yaml from "js-yaml";
+import * as path from "path";
 
 export function deploy(provider: k8s.Provider, clusterName: string): Promise<void> {
     if (!clusterName) {
@@ -139,7 +140,8 @@ export function deploy(provider: k8s.Provider, clusterName: string): Promise<voi
     }, { provider });
 
     // Read and customize YAML
-    const kubeBenchYaml = yaml.load(fs.readFileSync("/workspaces/effektiv-ai/src/pulumi-k8s/kube-bench/kube-bench.yaml", "utf8")) as any;
+    const kubeBenchPath = path.join(process.cwd(), "kube-bench", "kube-bench.yaml");
+    const kubeBenchYaml = yaml.load(fs.readFileSync(kubeBenchPath, "utf8")) as any;
     kubeBenchYaml.metadata.name = `kube-bench`;
     kubeBenchYaml.metadata.namespace = namespaceName; // Set namespace
 
