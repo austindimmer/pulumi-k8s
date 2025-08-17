@@ -3,7 +3,7 @@ description: A minimal TypeScript Pulumi program
 runtime:
   name: nodejs
   options:
-    packagemanager: pnpm
+    packagemanager: npm
 config:
   pulumi:tags:
     value:

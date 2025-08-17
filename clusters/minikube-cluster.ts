@@ -3,23 +3,33 @@ import * as k8s from "@pulumi/kubernetes";
 import * as command from "@pulumi/command";
 import { IMinikubeClusterConfig } from "../types/interfaces";
 
-// Class for Minikube cluster management
 export class MinikubeCluster {
     provider: k8s.Provider;
 
     constructor(config: IMinikubeClusterConfig) {
         const { name, kubernetesVersion, numberOfCpus, memory, metalLbRange } = config;
 
-        // Start Minikube
+        // Set fixed SSH and API ports
+        const sshPort = 2222; // Fix SSH port to 2222 (avoid randomness)
+        const apiServerPort = 8443; // Fix API server port
+
+        // Start Minikube with fixed ports
         const startMinikube = new command.local.Command(`startMinikube-${name}`, {
             create: `
-                if ! minikube status --profile ${name} --output=json | grep -q '"Running"'; then 
-                    minikube start --profile ${name} --driver=docker --kubernetes-version=${kubernetesVersion} --cpus=${numberOfCpus} --memory=${memory};
+                if ! minikube status --profile ${name} --output=json | grep -q '"Running"'; then
+                    minikube start \
+                        --profile ${name} \
+                        --driver=docker \
+                        --kubernetes-version=${kubernetesVersion} \
+                        --cpus=${numberOfCpus} \
+                        --memory=${memory} \
+                        --ports=${sshPort}:22 --ports=${apiServerPort}:${apiServerPort} \
+                        --apiserver-port=${apiServerPort} \
+                        --apiserver-ips=0.0.0.0;
                 fi`,
             delete: `minikube delete --profile ${name}`,
-            triggers: [kubernetesVersion, numberOfCpus, memory],
+            triggers: [kubernetesVersion, numberOfCpus, memory, sshPort, apiServerPort],
         });
-        pulumi.log.info(`Minikube cluster '${name}' initialized with kubernetesVersion: ${kubernetesVersion}, ${numberOfCpus} CPUs and ${memory} memory.`);
 
         const connectDevToMinikubeNet = new command.local.Command(`connect-net-${name}`, {
             create: `
@@ -30,11 +40,14 @@ export class MinikubeCluster {
             `
         }, { dependsOn: startMinikube });
 
+        pulumi.log.info(`Minikube cluster '${name}' initialized with Kubernetes ${kubernetesVersion}, ${numberOfCpus} CPUs, ${memory} memory.`);
+
         // Initialize MetalLB
         const initializeMetalLB = new command.local.Command(`initializeMetalLB-${name}`, {
             create: `minikube addons enable metallb --profile ${name}`,
             delete: `minikube addons disable metallb --profile ${name}`,
         }, { dependsOn: startMinikube });
+
         pulumi.log.info(`MetalLB enabled for Minikube cluster '${name}'.`);
 
         // Configure MetalLB with dynamic IP pool
@@ -58,24 +71,20 @@ metadata:
   namespace: metallb-system
 spec: {}
 EOF
-            `,
-            delete: `kubectl --context=${name} delete ipaddresspool default-pool -n metallb-system --ignore-not-found=true`,
-        }, { dependsOn: [initializeMetalLB, connectDevToMinikubeNet] });
+`,
+            delete: `kubectl delete configmap config -n metallb-system`,
+        }, { dependsOn: initializeMetalLB });
         pulumi.log.info(`MetalLB configured with IP range ${metalLbRange} for cluster '${name}'.`);
 
         // Configure kubeconfig for the cluster
-        const kubeconfig = new command.local.Command(`kcfg-${name}`, {
-            create: `minikube -p ${name} kubeconfig`
-        }, { dependsOn: startMinikube });
-
-        const minikubeProvider = new k8s.Provider(`minikube-${name}`, {
-            kubeconfig: kubeconfig.stdout
-        }, { dependsOn: [kubeconfig, configureMetalLB] });
+        const kubeconfig = process.env.KUBECONFIG || `~/.kube/config`;
+        const minikubeProvider = new k8s.Provider(`minikube-${name}`, { kubeconfig }, { dependsOn: [startMinikube, configureMetalLB] });
 
         // Deploy a test namespace to verify connectivity
         const testNamespace = new k8s.core.v1.Namespace(`test-namespace-${name}`, {
             metadata: { name: `test-namespace-${name}` },
         }, { provider: minikubeProvider });
+
         pulumi.log.info(`Test namespace 'test-namespace-${name}' deployed successfully to cluster '${name}'.`);
 
         // Assign the provider to the class instance

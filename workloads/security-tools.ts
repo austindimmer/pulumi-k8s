@@ -150,15 +150,15 @@ export function deploy(provider: k8s.Provider, clusterName: string): Promise<voi
         yaml: [yaml.dump(kubeBenchYaml)],
     }, { provider, dependsOn: [securityNamespace] });
 
-    new k8s.helm.v3.Chart(`gatekeeper`, {
-        chart: "gatekeeper",
-        version: "3.11.0",
-        fetchOpts: { repo: "https://open-policy-agent.github.io/gatekeeper/charts" },
-        namespace: namespaceName,
-        values: {
-            fullnameOverride: `gatekeeper`,
-        },
-    }, { provider, dependsOn: [securityNamespace] });
+    // new k8s.helm.v3.Chart(`gatekeeper`, {
+    //     chart: "gatekeeper",
+    //     version: "3.11.0",
+    //     fetchOpts: { repo: "https://open-policy-agent.github.io/gatekeeper/charts" },
+    //     namespace: namespaceName,
+    //     values: {
+    //         fullnameOverride: `gatekeeper`,
+    //     },
+    // }, { provider, dependsOn: [securityNamespace] });
 
     return Promise.resolve();
 }

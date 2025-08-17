@@ -17,9 +17,11 @@
     },
     "files": [
         "index.ts",
+        "declarations.d.ts",
         "typings.d.ts"
     ],
     "include": [
+        "declarations.d.ts",
         "typings.d.ts",
         "./**/*.ts"
     ],
